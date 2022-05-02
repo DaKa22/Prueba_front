@@ -103,6 +103,32 @@
       </div>
     `;
 
+    let detalleArtista = {
+      condicionArtist: false,
+      condicionAlbum: false,
+      condicionTop: false,
+      condicionRelated: false,
+      artist: null,
+      album: null,
+      top: null,
+      related: null,
+    };
+
+    const agregarCeroSiEsNecesario = valor => {
+      if (valor < 10) {
+        return "0" + valor;
+      } else {
+        return "" + valor;
+      }
+    }
+
+    const milisegundosAMinutosYSegundos = (milisegundos) => {
+      const minutos = parseInt(milisegundos / 1000 / 60);
+      milisegundos -= minutos * 60 * 1000;
+      const segundos = Math.round((milisegundos / 1000));
+      return `${agregarCeroSiEsNecesario(minutos)}:${agregarCeroSiEsNecesario(segundos)}`;
+    };
+
     init()
 
     function init() {
@@ -167,7 +193,6 @@
             'Authorization': 'Bearer ' + access_token
           },
           success: function ({ albums: { items, previous, next } }) {
-            console.log(items)
             let html = htmlReleases(items, { previous, next })
             $('#oauth').html(html)
           },
@@ -205,19 +230,19 @@
     function buscarArtistaApi(url) {
       let access_token = localStorage.getItem('access_token')
       $.ajax({
-          url,
-          headers: {
-            'Authorization': 'Bearer ' + access_token
-          },
-          success: function ({ artists: { items, previous, next } }) {
-            let html = htmlArtistas(items, { previous, next })
-            $('#oauth').html(html)
-          },
-          error: function (error) {
-            localStorage.clear();
-            window.location.href = '/'
-          }
-        });
+        url,
+        headers: {
+          'Authorization': 'Bearer ' + access_token
+        },
+        success: function ({ artists: { items, previous, next } }) {
+          let html = htmlArtistas(items, { previous, next })
+          $('#oauth').html(html)
+        },
+        error: function (error) {
+          localStorage.clear();
+          window.location.href = '/'
+        }
+      });
     }
 
     function buscarArtista({ keyCode, target: { value } }) {
@@ -239,7 +264,7 @@
       for (const iterator of items) {
         html += `
           <div class="col-3 py-2">
-            <div class="card px-2" style="width: 18rem;">
+            <div class="card px-2" style="width: 18rem;" onclick="showArtist('${iterator.artists[0].id}')">
               <img src="${iterator.images[0].url}" class="card-img-top rounded" alt="${iterator.name}">
               <div class="card-body">
                 <h6 class="card-title text-white">${iterator.name}</h6>
@@ -352,8 +377,197 @@
 
     }
     
-    function showArtist(url) {
-      
+    function showArtist(id) {
+      let access_token = localStorage.getItem('access_token');
+      $.ajax({
+        url: `https://api.spotify.com/v1/artists/${id}`,
+        headers: {
+          'Authorization': 'Bearer ' + access_token
+        },
+        success: function (items) {
+          detalleArtista.condicionArtist = true
+          detalleArtista.artist = items
+          validarPeticionAsincrona()
+        },
+        error: function (error) {
+          localStorage.clear();
+          window.location.href = '/'
+        }
+      });
+      $.ajax({
+        url: `https://api.spotify.com/v1/artists/${id}/albums`,
+        headers: {
+          'Authorization': 'Bearer ' + access_token
+        },
+        success: function ({ items }) {
+          detalleArtista.condicionAlbum = true
+          detalleArtista.album = items
+          validarPeticionAsincrona()
+        },
+        error: function (error) {
+          localStorage.clear();
+          window.location.href = '/'
+        }
+      });
+      $.ajax({
+        url: `https://api.spotify.com/v1/artists/${id}/top-tracks?market=CO`,
+        headers: {
+          'Authorization': 'Bearer ' + access_token
+        },
+        success: function ({ tracks }) {
+          detalleArtista.condicionTop = true
+          detalleArtista.top = tracks
+          validarPeticionAsincrona()
+        },
+        error: function (error) {
+          localStorage.clear();
+          window.location.href = '/'
+        }
+      });
+      $.ajax({
+        url: `https://api.spotify.com/v1/artists/${id}/related-artists`,
+        headers: {
+          'Authorization': 'Bearer ' + access_token
+        },
+        success: function ({ artists }) {
+          detalleArtista.condicionRelated = true
+          detalleArtista.related = artists
+          validarPeticionAsincrona()
+        },
+        error: function (error) {
+          localStorage.clear();
+          window.location.href = '/'
+        }
+      });
+    }
+
+    function validarPeticionAsincrona() {
+      if (
+        detalleArtista.condicionAlbum &&
+        detalleArtista.condicionArtist &&
+        detalleArtista.condicionRelated &&
+        detalleArtista.condicionTop
+      ) {
+        detalleArtista.album = detalleArtista.album.slice(0, 6)
+        let html = navbar
+
+        // Left
+
+        html += `
+          <div class="row">
+            <div class="col-3 py-5">
+              <div class="w-100 text-center py-3">
+                <img class="rounded-circle w-50" src="${detalleArtista.artist.images[0].url}" >
+                <h3 class="text-center py-3 text-white">${detalleArtista.artist.name}</h3>
+              </div>
+              <div class="container text-white">
+                <h5>About</h5>
+                <hr>
+                <p>Generos</p>
+                `;
+        
+        for (const iterator of detalleArtista.artist.genres) {
+          html += `<li>${iterator}</li>`;
+        }
+
+        html += `
+          <hr>
+          <h5>Similar to ${detalleArtista.artist.name}</h5>
+          <div class="row pt-3">
+        `;
+
+        for (const iterator of detalleArtista.related) {
+          html += `
+            <div class="col-3 py-2">
+              <img class="rounded-circle" src="${iterator.images[0].url}" >
+            </div>
+            `;
+        }
+        
+        html += `
+              </div>
+            </div>
+          </div>
+        `;
+
+        //right 
+        html += `
+            <div class="col-9 text-white">
+              <div class="row text-white py-4">
+                <div class="col-6 ps-3">
+                  <h4>Albums</h4>
+                </div>
+                <div class="col-6 pe-4 text-end">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" class="navegacion-spotify">
+                    <path d="M224 480c-8.188 0-16.38-3.125-22.62-9.375l-192-192c-12.5-12.5-12.5-32.75 0-45.25l192-192c12.5-12.5 32.75-12.5 45.25 0s12.5 32.75 0 45.25L77.25 256l169.4 169.4c12.5 12.5 12.5 32.75 0 45.25C240.4 476.9 232.2 480 224 480z"/>
+                  </svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" class="navegacion-spotify">
+                    <path d="M96 480c-8.188 0-16.38-3.125-22.62-9.375c-12.5-12.5-12.5-32.75 0-45.25L242.8 256L73.38 86.63c-12.5-12.5-12.5-32.75 0-45.25s32.75-12.5 45.25 0l192 192c12.5 12.5 12.5 32.75 0 45.25l-192 192C112.4 476.9 104.2 480 96 480z"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="row text-white justify-content-around">
+        `;
+        
+        for (const iterator of detalleArtista.album) {
+          html += `
+            <div class="col-2 py-2">
+              <div class="card px-2">
+                <img src="${iterator.images[0].url}" class="card-img-top rounded" alt="${iterator.name}">
+                <div class="card-body">
+                  <h6 class="card-title text-white">${iterator.name}</h6>
+                  <p class="card-text text-gray">
+                    ${iterator.release_date.split('-')[0]}
+                  </p>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+        
+        html += `
+            </div>
+            <hr>
+            <h2 class="py-3">Most Popular Tracks</h2>
+            <div class="row">
+        `;
+        let contador = 1;
+        for (const iterator of detalleArtista.top) {
+          html += `
+            <div class="col-12 py-1">
+              <div class="row">
+                <div class="col-1 text-center align-self-center">
+                  ${contador}
+                </div>
+                <div class="col-1">
+                  <img class="rounded" src=${iterator.album.images[0].url} >
+                </div>
+                <div class="col-8">
+                  <h6 class="card-title text-white">${iterator.name}</h6>
+                  <p class="card-text text-gray">
+                    ${iterator.album.name}
+                  </p>
+                </div>
+                <div class="col-2">
+                  ${milisegundosAMinutosYSegundos(Math.round(iterator.duration_ms))}
+                </div>
+              </div>
+            </div>
+          `;
+          contador++;
+        }
+
+        html +=` 
+            </div>
+          </div> 
+        `;
+
+        html += `
+          </div>
+        `;
+        
+        $('#oauth').html(html)
+      }
     }
 
     function pagesHtml ({ previous, next }, type ) {
